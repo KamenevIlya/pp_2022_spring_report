@@ -1,0 +1,1181 @@
+\documentclass{report}
+
+\usepackage[warn]{mathtext}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english, russian]{babel}
+\usepackage[pdftex]{hyperref}
+\usepackage{tempora}
+\usepackage[12pt]{extsizes}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+
+\geometry{a4paper,top=2cm,bottom=2cm,left=2.5cm,right=1.5cm}
+\setlength{\parskip}{0.5cm}
+\setlist{nolistsep, itemsep=0.3cm,parsep=0pt}
+
+\usepackage{listings}
+\lstset{language=C++,
+        basicstyle=\footnotesize,
+		keywordstyle=\color{blue}\ttfamily,
+		stringstyle=\color{red}\ttfamily,
+		commentstyle=\color{green}\ttfamily,
+		morecomment=[l][\color{red}]{\#}, 
+		tabsize=4,
+		breaklines=true,
+  		breakatwhitespace=true,
+  		title=\lstname,       
+}
+
+\makeatletter
+\renewcommand\@biblabel[1]{#1.\hfil}
+\makeatother
+
+\begin{document}
+
+\begin{titlepage}
+
+\begin{center}
+Министерство науки и высшего образования Российской Федерации
+\end{center}
+
+\begin{center}
+Федеральное государственное автономное образовательное учреждение высшего образования \\
+Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского
+\end{center}
+
+\begin{center}
+Институт информационных технологий, математики и механики
+\end{center}
+
+\vspace{4em}
+
+\begin{center}
+\textbf{\LargeОтчет по лабораторной работе} \\
+\end{center}
+\begin{center}
+\textbf{\Large?Умножение плотных матриц. Элементы типа double. Алгоритм Штрассена?} \\
+\end{center}
+
+\vspace{4em}
+
+\newbox{\lbox}
+\savebox{\lbox}{\hbox{text}}
+\newlength{\maxl}
+\setlength{\maxl}{\wd\lbox}
+\hfill\parbox{7cm}{
+\hspace*{5cm}\hspace*{-5cm}\textbf{Выполнил:} \\ студент группы 381906-3 \\ Каменев И. Б.\\
+\\
+\hspace*{5cm}\hspace*{-5cm}\textbf{Проверил:}\\ доцент кафедры МОСТ, \\ кандидат технических наук \\ Сысоев А. В.\\
+}
+\vspace{\fill}
+
+\begin{center} Нижний Новгород \\ 2022 \end{center}
+
+\end{titlepage}
+
+\setcounter{page}{2}
+
+% Содержание
+\tableofcontents
+\newpage
+
+% Введение
+\section*{Введение}
+\addcontentsline{toc}{section}{Введение}
+\par  Умножение матриц это одна из основных операций над матрицами. Сложность вычисления произведения матриц по определению составляет  $O(n^3)$, однако существуют более эффективные алгоритмы, применяющиеся для больших матриц. Вопрос о предельной скорости умножения больших матриц, также как и вопрос о построении наиболее быстрых и устойчивых практических алгоритмов умножения больших матриц остаётся одной из нерешённых проблем линейной алгебры.
+\par  При уместном использовании внедрение параллельных вычислений может дать существенный выигрыш во времени. Алгоритм Штрассена прекрасно подходит для этого, так как является рекурсивным. Кроме того, он сводит к минимуму количество использований наиболее затратной арифметической операции - умножения.
+\newpage
+
+% Постановка задачи
+\section*{Постановка задачи}
+\addcontentsline{toc}{section}{Постановка задачи}
+\par В рамках данной работы требовалось реализовать последовательную и параллельные версии алгоритма умножения плотных матриц при помощи алгоритма Штрассена. Кроме того, необходимо провести эксперименты по сравнению времени работы всех алгоритмов и подтверждению их корректности. На основе результатов данных экспериментов сделать выводы об эффективности приведенных реализаций.
+\par В качестве технологий, для создания параллельной программы использовались Open Multi-Processing (OpenMP), Intel Threading Building Blocks (TBB), а для проведения тестирования библиотека Google Test.
+\newpage
+
+% Описание алгоритма
+\section*{Описание алгоритма}
+\addcontentsline{toc}{section}{Описание алгоритма}
+\par Пусть $A$ и $B$ ? две $(n \times n)$-матрицы, причём $n$ ? степень числа 2. Тогда можно разбить каждую матрицу $A$ и $B$ на четыре $((n/2) \times (n/2))$-матрицы и через них выразить произведение матриц $A$ и $B$. Вычислив вспомогательные элементы, мы можем при помощи их комбинации с использованием сложения и вычитания вычислить элементы целевой матрицы. Благодаря алгоритму Штрассена, количество использований операции умножения сокращается до 7 на каждом этапе рекурсии. Рекурсивный процесс продолжается $n$ раз, до тех пор пока размер подматриц не станет достаточно малым, далее используют обычный метод умножения матриц. Это делают из-за того, что алгоритм Штрассена теряет эффективность по сравнению с обычным на малых матрицах в силу большего числа сложений.
+\par Пошаговый алгоритм:
+\begin{enumerate}
+\item Разбиваем матрицы $A$, $B$ на 4 равные части:
+\\ $A = 
+\begin{bmatrix} A_{1,1} A_{1,2} \\ A_{2,1} A_{2,2} \end{bmatrix}
+\quad B = 
+\begin{bmatrix} B_{1,1} B_{1,2} \\ B_{2,1} B_{2,2} \end{bmatrix}$
+\item Определяем вспомогательные элементы $P_1 - P_7$:
+\\ $P_1 = (A_{1,1} + A_{2,2})(B_{1,1} + B_{2,2})$
+\\ $P_2 = (A_{2,1} + A_{2,2})B_{1,1}$
+\\ $P_3 = A_{1,1}(B_{1,2} - B_{2,2})$
+\\ $P_4 = A_{2,2}(B_{2,1} + B_{1,1})$
+\\ $P_5 = (A_{1,1} + A_{1,2})B_{2,2}$
+\\ $P_6 = (A_{2,1} - A_{1,1})(B_{1,1} + B_{1,2})$
+\\ $P_7 = (A_{1,2} - A_{2,2})(B_{2,1} + B_{2,2})$
+\item Вычислим элементы целевой матрицы $C$:
+\\ $C_{1,1} = P_1 + P_4 - P_5 + P_7$
+\\ $C_{1,2} = P_3 + P_5$
+\\ $C_{2,1} = P_2 + P_4$
+\\ $C_{2,2} = P_1 - P_2 + P_3 + P_6$
+\item Продолжаем процесс рекурсивно пока размер матриц $C_{i,j}$ не станет достаточно малым. Оптимальным значением является $(64\times64)$. Затем используем наивный метод перемножения матриц.
+\end{enumerate}
+\newpage
+
+% Описание схемы распараллеливания
+\section*{Описание схемы распараллеливания}
+\addcontentsline{toc}{section}{Описание схемы распараллеливания}
+\par Распараллеливание программы происходит с помощью распределения данных и вычислительных операций между потоками. На вход параллельного алгоритма подаются две матрицы. Принцип распараллеливания данного алгоритма заключается в следующем: так как на каждом этапе рекурсии мы вычисляем 7 вспомогательных элементов, будем распределять задачи по их нахождению равномерно между всеми потоками. После выполнения своей части алгоритма, каждый поток возврашает в главный поток результат своей работы, где и формируется выходная матрица.
+\par В текущей реализации программы с помощью OpenMP распределение происходит с с ипользованием секций, определяемых директивами pragma omp section. В секции shared указываюстя переменные, общие для всех потоков. За создание параллельной секции отвечает директива \#pragma omp parallel sections.
+\par В TBB распределение происходит схожим образом. Однако теперь необходимо по аналогии с секциями определить группу задач tbb::task\_group. Далее, вызывая метод run на объекте класса task\_group и передавая ему в качестве аргумента функцию, которую необходимо запустить на новом потоке (рекурсивное вычисление элементов $P_1 - P_7$). Ожидаем завершение всех задач, вызвав метод wait.
+\newpage
+
+% Описание программной реализации
+\section*{Описание программной реализации}
+\addcontentsline{toc}{section}{Описание программной реализации}
+Программа состоит из заголовочного файла strassen\_matrix\_multiply\_<используемая технология>.h и двух файлов исходного кода strassen\_matrix\_multiply\_<используемая технология>.cpp и main.cpp.
+\par В заголовочном файле находятся прототипы функций для последовательного и параллельных алгоритмов нахождения кратчайших путей, в strassen\_matrix\_multiply\_<используемая технология>.cpp - их реализация, а файл main.cpp содержит тесты, проверяющие корректность и эффективность работы программы.
+\par Вспомогательные функции для всех версий алгоритма:
+\begin{lstlisting}
+void naive_mult(double* a, double* b, double* c, int size);
+bool is_exp_of_2(int n);
+void get_p1(double* a11, double* a22, double* b11, double* b22, double* slice,
+            int size);
+void get_p2(double* a21, double* a22, double* b11, double* slice, int size);
+void get_p3(double* a11, double* b12, double* b22, double* slice, int size);
+void get_p4(double* a22, double* b21, double* b11, double* slice, int size);
+void get_p5(double* a11, double* a12, double* b22, double* slice, int size);
+void get_p6(double* a21, double* a11, double* b11, double* b12, double* slice,
+            int size);
+void get_p7(double* a12, double* a22, double* b21, double* b22, double* slice,
+            int size);
+\end{lstlisting}
+\par Параметры $a_{i,j}$, $b_{i,j}$ представляют собой соответствующие элементы матриц a, b, slice - уже вычисленные значения $P_i$, size - размер матрицы.
+\par Функция для последовательного алгоритма:
+\begin{lstlisting}
+void strassen(double* a, double* b, double* c, int size);
+\end{lstlisting}
+\par Функция для параллельного omp алгоритма:
+\begin{lstlisting}
+void strassen_omp(double* a, double* b, double* c, int size);
+\end{lstlisting}
+\par Функция для параллельного tbb алгоритма:
+\begin{lstlisting}
+void strassen_tbb(double* a, double* b, double* c, int size);
+\end{lstlisting}
+\par Параметры a, b представляют собой исходные матрицы, c - целевую, size - размер матрицы.
+
+\newpage
+
+% Подтверждение корректности
+\section*{Подтверждение корректности}
+\addcontentsline{toc}{section}{Подтверждение корректности}
+\par Проверку корректности работы программы обеспечивают 5 тестовых функций реализованных с помощью библиотеки "Google Test".
+\par Первые 4 теста делают запуск алгоритма Штрассена (последовательного или параллельного в зависимости от задачи) и сравнивают результат с вычисленным наивным способом. Размеры матриц 8, 128, 256, 1024 соответственно.
+\par Пятый тест запускает алгоритм Штрассена для невалидного значения. Ожидается генерация исключения.
+\par Успешное прохождение всех тестов можно считать подтверждением корректности работы программы.
+\newpage
+
+% Результаты экспериментов
+\section*{Результаты экспериментов}
+\addcontentsline{toc}{section}{Результаты экспериментов}
+Вычислительные эксперименты для оценки эффективности работы параллельного алгоритма проводились на ноутбуке со следующими характеристиками:
+\begin{itemize}
+\item Процессор: Intel Core i5-8300H;
+\item Оперативная память: 16 ГБ (DDR4), 2666 МГц;
+\item Операционная система: Windows 10 Home.
+\end{itemize}
+\par Замеры времени работы алгоритмов проводились на тестовой функции 8 (граф с 100 вершинами). Тестирование проводилось в режиме Release-x64. В параллельных реализациях создавалось 6 потоков.
+
+\par Результаты экспериментов представлены в Таблице.
+\begin{table}[!h]
+\caption{Результаты вычислительных экспериментов}
+\centering
+\begin{tabular}{| p{2cm} | p{3cm} | p{4cm} | p{2cm} |}
+\hline
+Версия алгоритма & Время работы (в секундах) & Ускорение  \\[5pt]
+\hline
+Naive               & 21.142        & -     \\
+Sequential        & 3.187        & -         \\
+OpenMP        & 1.161        & 2.68         \\
+TBB       & 0.992        & 3.21      \\
+
+\hline
+\end{tabular}
+\end{table}
+
+\newpage
+
+% Выводы из результатов экспериментов
+\section*{Выводы из результатов экспериментов}
+\addcontentsline{toc}{section}{Выводы из результатов экспериментов}
+На основе данных, полученных в результате экспериментов, можно сделать вывод, что параллельные версии работают быстрее, чем последовательная. В обоих случаях удалось достичь ускорения более, чем в 2 раза, а наилучшие результаты показал TBB, улучшив производительность более чем в 3 раза. Также не стоит забывать, что помимо нашей программы в системе работают и другие программы/сервисы/службы, для которых также выделяются ресурсы.
+\newpage
+
+% Заключение
+\section*{Заключение}
+\addcontentsline{toc}{section}{Заключение}
+В рамках лабораторной работы были реализованы последовательный и параллельный алгоритмы умножения плотных матриц при помощи алгоритма Штрассена. Проведенные тесты показали корректность написанного кода, а замеры времени - эффективность параллельных версий.
+\newpage
+
+% Литература
+\section*{Литература}
+\addcontentsline{toc}{section}{Литература}
+\begin{enumerate}
+\item Алгоритм Штрасена - Электронный ресурс. URL: \newline \url{https://habr.com/ru/post/313258/}
+\item OpenMP - Электронный ресурс. URL: \newline \url{https://curc.readthedocs.io/en/latest/programming/OpenMP-C}
+\item TBB - Электронный ресурс. URL: \newline \url{https://habr.com/ru/company/intel/blog/157735/}
+\item А.В. Сысоев, И.Б. Мееров, А.А. Сиднев ?Средства разработки параллельных программ для систем с общей памятью. Библиотека Intel Threading Building Blocks?. Нижний Новгород, 2007, 128 с.
+\end{enumerate} 
+\newpage
+
+% Приложение
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+\textbf{Последовательная версия}
+\newline
+\newline strassen\_matrix\_multiply.h
+\begin{lstlisting}
+/ Copyright 2022 Kamenev Ilya
+#ifndef MODULES_TASK_1_KAMENEV_I_STRASSEN_MATRIX_MULTIPLY_STRASSEN_MATRIX_MULTIPLY_H_
+#define MODULES_TASK_1_KAMENEV_I_STRASSEN_MATRIX_MULTIPLY_STRASSEN_MATRIX_MULTIPLY_H_
+
+void strassen(double* a, double* b, double* c, int size);
+void naive_mult(double* a, double* b, double* c, int size);
+bool is_exp_of_2(int n);
+void get_p1(double* a11, double* a22, double* res1, double* b11, double* b22,
+        double* res2, double* slice1, int size);
+void get_p2(double* a21, double* a22, double* res1, double* b11, double* slice2,
+        int size);
+void get_p3(double* a11, double* res1, double* b12, double* b22, double* slice3,
+        int size);
+void get_p4(double* a22, double* res1, double* b21, double* b11, double* slice4,
+        int size);
+void get_p5(double* a11, double* a12, double* res1, double* b22, double* slice5,
+        int size);
+void get_p6(double* a21, double* a11, double* res1, double* b11, double* b12,
+            double* res2, double* slice6, int size);
+void get_p7(double* a12, double* a22, double* res1, double* b21, double* b22,
+            double* res2, double* slice7, int size);
+
+#endif  // MODULES_TASK_1_KAMENEV_I_STRASSEN_MATRIX_MULTIPLY_STRASSEN_MATRIX_MULTIPLY_H_
+
+
+
+\end{lstlisting}
+main.cpp
+\begin{lstlisting}
+// Copyright 2022 Kamenev Ilya
+
+#include <gtest/gtest.h>
+
+#include <stdexcept>
+#include <vector>
+#include <chrono>
+#include "./strassen_matrix_multiply.h"
+
+TEST(Kamenev_Strassen_Seq, MatrixSize8Test) {
+  int size = 8;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_res(size * size);
+  std::vector<double> naive_res(size * size);
+
+  for (int i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  strassen(a.data(), b.data(), strassen_res.data(), size);
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+  ASSERT_EQ(naive_res, strassen_res);
+}
+
+TEST(Kamenev_Strassen_Seq, MatrixSize128Test) {
+  int size = 128;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_res(size * size);
+  std::vector<double> naive_res(size * size);
+
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  strassen(a.data(), b.data(), strassen_res.data(), size);
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+  ASSERT_EQ(naive_res, strassen_res);
+}
+
+TEST(Kamenev_Strassen_Seq, MatrixSize256Test) {
+  int size = 256;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_res(size * size);
+  std::vector<double> naive_res(size * size);
+
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  auto begin = std::chrono::steady_clock::now();
+  strassen(a.data(), b.data(), strassen_res.data(), size);
+  auto end = std::chrono::steady_clock::now();
+  auto elapsed_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
+  std::cout << "Strassen: " << elapsed_ms.count() << std::endl;
+
+  auto begin_nav = std::chrono::steady_clock::now();
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+  auto end_nav = std::chrono::steady_clock::now();
+  auto elapsed_ms_nav = std::chrono::duration_cast<std::chrono::milliseconds>(
+      end_nav - begin_nav);
+  std::cout << "Naive: " << elapsed_ms_nav.count() << std::endl;
+  ASSERT_EQ(naive_res, strassen_res);
+}
+
+TEST(Kamenev_Strassen_Seq, MatrixSize1024Test) {
+  int size = 1024;
+
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_res(size * size);
+  std::vector<double> naive_res(size * size);
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+
+  auto begin = std::chrono::steady_clock::now();
+  strassen(a.data(), b.data(), strassen_res.data(), size);
+  auto end = std::chrono::steady_clock::now();
+  auto elapsed_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
+  std::cout << "Strassen: " << elapsed_ms.count() << std::endl;
+
+  auto begin_nav = std::chrono::steady_clock::now();
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+  auto end_nav = std::chrono::steady_clock::now();
+  auto elapsed_ms_nav = std::chrono::duration_cast<std::chrono::milliseconds>(
+      end_nav - begin_nav);
+  std::cout << "Naive: " << elapsed_ms_nav.count() << std::endl;
+  ASSERT_EQ(naive_res, strassen_res);
+}
+
+TEST(Kamenev_Strassen_Seq, InvalidSizeTest) {
+  int size = 57;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_res(size * size);
+
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  ASSERT_THROW(strassen(a.data(), b.data(), strassen_res.data(), size),
+               std::invalid_argument);
+}
+
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
+
+
+
+\end{lstlisting}
+strassen\_matrix\_multiply.cpp
+\begin{lstlisting}
+// Copyright 2022 Kamenev Ilya
+
+#include <math.h>
+
+#include <stdexcept>
+#include <string>
+
+#include "../../modules/task_1/kamenev_i_strassen_matrix_multiply/strassen_matrix_multiply.h"
+
+void naive_mult(double* a, double* b, double* c, int size) {
+  for (int i = 0; i < size; i++) {
+    for (int j = 0; j < size; j++) {
+      c[i * size + j] = 0;
+      for (int k = 0; k < size; k++) {
+        c[i * size + j] += a[i * size + k] * b[k * size + j];
+      }
+    }
+  }
+}
+
+void get_p1(double* a11, double* a22, double* res1, double* b11, double* b22,
+        double* res2, double* slice, int size) {
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a11[i] + a22[i];
+    res2[i] = b11[i] + b22[i];
+  }
+  strassen(res1, res2, slice, size);
+}
+void get_p2(double* a21, double* a22, double* res1, double* b11, double* slice,
+        int size) {
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a21[i] + a22[i];
+  }
+  strassen(res1, b11, slice, size);
+}
+void get_p3(double* a11, double* res1, double* b12, double* b22, double* slice,
+        int size) {
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = b12[i] - b22[i];
+  }
+  strassen(a11, res1, slice, size);
+}
+void get_p4(double* a22, double* res1, double* b21, double* b11, double* slice,
+        int size) {
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = b21[i] - b11[i];
+  }
+  strassen(a22, res1, slice, size);
+}
+void get_p5(double* a11, double* a12, double* res1, double* b22, double* slice,
+        int size) {
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a11[i] + a12[i];
+  }
+  strassen(res1, b22, slice, size);
+}
+void get_p6(double* a21, double* a11, double* res1, double* b11, double* b12,
+            double* res2, double* slice, int size) {
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a21[i] - a11[i];
+    res2[i] = b11[i] + b12[i];
+  }
+  strassen(res1, res2, slice, size);
+}
+void get_p7(double* a12, double* a22, double* res1, double* b21, double* b22,
+            double* res2, double* slice, int size) {
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a12[i] - a22[i];
+    res2[i] = b21[i] + b22[i];
+  }
+  strassen(res1, res2, slice, size);
+}
+
+bool is_exp_of_2(int n) { return (n & (n - 1)) == 0; }
+
+void strassen(double* a, double* b, double* c, int size) {
+  if (!is_exp_of_2(size)) {
+    throw std::invalid_argument("no power 2");
+  }
+
+  if (size <= 64) {
+    naive_mult(a, b, c, size);
+    return;
+  }
+
+  int part_size = static_cast<int>(size * size / 4);
+
+  double* a11 = new double[size * size * 2];
+  double* a12 = a11 + part_size;
+  double* a21 = a12 + part_size;
+  double* a22 = a21 + part_size;
+
+  double* b11 = a22 + part_size;
+  double* b12 = b11 + part_size;
+  double* b21 = b12 + part_size;
+  double* b22 = b21 + part_size;
+
+  double* c11 = new double[size * size + part_size * 9];
+  double* c12 = c11 + part_size;
+  double* c21 = c12 + part_size;
+  double* c22 = c21 + part_size;
+
+  double* slice1 = c22 + part_size;
+  double* slice2 = slice1 + part_size;
+  double* slice3 = slice2 + part_size;
+  double* slice4 = slice3 + part_size;
+  double* slice5 = slice4 + part_size;
+  double* slice6 = slice5 + part_size;
+  double* slice7 = slice6 + part_size;
+
+  double* res1 = slice7 + part_size;
+  double* res2 = res1 + part_size;
+
+  int half_split = static_cast<int>(size / 2);
+  for (int i = 0; i < half_split; i++) {
+    for (int j = 0; j < half_split; j++) {
+      a11[i * half_split + j] = a[i * size + j];
+      a12[i * half_split + j] = a[i * size + half_split + j];
+      a21[i * half_split + j] = a[(half_split + i) * size + j];
+      a22[i * half_split + j] = a[(half_split + i) * size + half_split + j];
+
+      b11[i * half_split + j] = b[i * size + j];
+      b12[i * half_split + j] = b[i * size + half_split + j];
+      b21[i * half_split + j] = b[(half_split + i) * size + j];
+      b22[i * half_split + j] = b[(half_split + i) * size + half_split + j];
+    }
+  }
+
+  get_p1(a11, a22, res1, b11, b22, res2, slice1, size / 2);
+  get_p2(a21, a22, res1, b11, slice2, size / 2);
+  get_p3(a11, res1, b12, b22, slice3, size / 2);
+  get_p4(a22, res1, b21, b11, slice4, size / 2);
+  get_p5(a11, a12, res1, b22, slice5, size / 2);
+  get_p6(a21, a11, res1, b11, b12, res2, slice6, size / 2);
+  get_p7(a12, a22, res1, b21, b22, res2, slice7, size / 2);
+
+  for (int i = 0; i < (size / 2) * (size / 2); i++) {
+    res1[i] = slice1[i] + slice4[i];
+    res2[i] = res1[i] - slice5[i];
+    c11[i] = res2[i] + slice7[i];
+
+    c12[i] = slice3[i] + slice5[i];
+
+    c21[i] = slice2[i] + slice4[i];
+
+    res1[i] = slice1[i] - slice2[i];
+    res2[i] = res1[i] + slice3[i];
+    c22[i] = res2[i] + slice6[i];
+  }
+
+  for (int i = 0; i < half_split; i++) {
+    for (int j = 0; j < half_split; j++) {
+      c[i * size + j] = c11[i * half_split + j];
+      c[i * size + half_split + j] = c12[i * half_split + j];
+      c[(half_split + i) * size + j] = c21[i * half_split + j];
+      c[(half_split + i) * size + half_split + j] = c22[i * half_split + j];
+    }
+  }
+
+  delete[] a11;
+  delete[] c11;
+}
+
+
+\end{lstlisting}
+
+\textbf{OpenMP version}
+\newline
+\newline strassen\_matrix\_multiply\_omp.h
+\begin{lstlisting}
+// Copyright 2022 Kamenev Ilya
+#ifndef MODULES_TASK_2_KAMENEV_I_STRASSEN_MATRIX_MULTIPLY_OMP_STRASSEN_MATRIX_MULTIPLY_OMP_H_
+#define MODULES_TASK_2_KAMENEV_I_STRASSEN_MATRIX_MULTIPLY_OMP_STRASSEN_MATRIX_MULTIPLY_OMP_H_
+
+void strassen_omp(double* a, double* b, double* c, int size);
+void naive_mult(double* a, double* b, double* c, int size);
+bool is_exp_of_2(int n);
+void get_p1(double* a11, double* a22, double* b11, double* b22, double* slice,
+            int size);
+void get_p2(double* a21, double* a22, double* b11, double* slice, int size);
+void get_p3(double* a11, double* b12, double* b22, double* slice, int size);
+void get_p4(double* a22, double* b21, double* b11, double* slice, int size);
+void get_p5(double* a11, double* a12, double* b22, double* slice, int size);
+void get_p6(double* a21, double* a11, double* b11, double* b12, double* slice,
+            int size);
+void get_p7(double* a12, double* a22, double* b21, double* b22, double* slice,
+            int size);
+
+#endif  // MODULES_TASK_2_KAMENEV_I_STRASSEN_MATRIX_MULTIPLY_OMP_STRASSEN_MATRIX_MULTIPLY_OMP_H_
+
+
+\end{lstlisting}
+strassen\_matrix\_multiply\_omp.cpp
+\begin{lstlisting}
+// Copyright 2022 Kamenev Ilya
+
+#include <math.h>
+
+#include <stdexcept>
+#include <string>
+
+#include "../../modules/task_2/kamenev_i_strassen_matrix_multiply_omp/strassen_matrix_multiply_omp.h"
+
+void naive_mult(double* a, double* b, double* c, int size) {
+  for (int i = 0; i < size; i++) {
+    for (int j = 0; j < size; j++) {
+      c[i * size + j] = 0;
+      for (int k = 0; k < size; k++) {
+        c[i * size + j] += a[i * size + k] * b[k * size + j];
+      }
+    }
+  }
+}
+
+void get_p1(double* a11, double* a22, double* b11, double* b22, double* slice,
+        int size) {
+  double* res1 = new double[size * size * 2];
+  double* res2 = res1 + size * size;
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a11[i] + a22[i];
+    res2[i] = b11[i] + b22[i];
+  }
+  strassen_omp(res1, res2, slice, size);
+  delete[] res1;
+}
+void get_p2(double* a21, double* a22, double* b11, double* slice, int size) {
+  double* res1 = new double[size * size];
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a21[i] + a22[i];
+  }
+  strassen_omp(res1, b11, slice, size);
+  delete[] res1;
+}
+void get_p3(double* a11, double* b12, double* b22, double* slice, int size) {
+  double* res1 = new double[size * size];
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = b12[i] - b22[i];
+  }
+  strassen_omp(a11, res1, slice, size);
+  delete[] res1;
+}
+void get_p4(double* a22, double* b21, double* b11, double* slice, int size) {
+  double* res1 = new double[size * size];
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = b21[i] - b11[i];
+  }
+  strassen_omp(a22, res1, slice, size);
+  delete[] res1;
+}
+void get_p5(double* a11, double* a12, double* b22, double* slice, int size) {
+  double* res1 = new double[size * size];
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a11[i] + a12[i];
+  }
+  strassen_omp(res1, b22, slice, size);
+  delete[] res1;
+}
+void get_p6(double* a21, double* a11, double* b11, double* b12, double* slice,
+        int size) {
+  double* res1 = new double[size * size * 2];
+  double* res2 = res1 + size * size;
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a21[i] - a11[i];
+    res2[i] = b11[i] + b12[i];
+  }
+  strassen_omp(res1, res2, slice, size);
+  delete[] res1;
+}
+void get_p7(double* a12, double* a22, double* b21, double* b22, double* slice,
+        int size) {
+  double* res1 = new double[size * size * 2];
+  double* res2 = res1 + size * size;
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a12[i] - a22[i];
+    res2[i] = b21[i] + b22[i];
+  }
+  strassen_omp(res1, res2, slice, size);
+  delete[] res1;
+}
+
+bool is_exp_of_2(int n) { return (n & (n - 1)) == 0; }
+
+void strassen_omp(double* a, double* b, double* c, int size) {
+  if (!is_exp_of_2(size)) {
+    throw std::invalid_argument("no power 2");
+  }
+
+  if (size <= 32) {
+    naive_mult(a, b, c, size);
+    return;
+  }
+
+  int part_size = static_cast<int>(size * size / 4);
+
+  double* a11 = new double[size * size * 2];
+  double* a12 = a11 + part_size;
+  double* a21 = a12 + part_size;
+  double* a22 = a21 + part_size;
+
+  double* b11 = a22 + part_size;
+  double* b12 = b11 + part_size;
+  double* b21 = b12 + part_size;
+  double* b22 = b21 + part_size;
+
+  double* c11 = new double[size * size + part_size * 9];
+  double* c12 = c11 + part_size;
+  double* c21 = c12 + part_size;
+  double* c22 = c21 + part_size;
+
+  double* slice1 = c22 + part_size;
+  double* slice2 = slice1 + part_size;
+  double* slice3 = slice2 + part_size;
+  double* slice4 = slice3 + part_size;
+  double* slice5 = slice4 + part_size;
+  double* slice6 = slice5 + part_size;
+  double* slice7 = slice6 + part_size;
+
+  int half_split = static_cast<int>(size / 2);
+  for (int i = 0; i < half_split; i++) {
+    for (int j = 0; j < half_split; j++) {
+      a11[i * half_split + j] = a[i * size + j];
+      a12[i * half_split + j] = a[i * size + half_split + j];
+      a21[i * half_split + j] = a[(half_split + i) * size + j];
+      a22[i * half_split + j] = a[(half_split + i) * size + half_split + j];
+
+      b11[i * half_split + j] = b[i * size + j];
+      b12[i * half_split + j] = b[i * size + half_split + j];
+      b21[i * half_split + j] = b[(half_split + i) * size + j];
+      b22[i * half_split + j] = b[(half_split + i) * size + half_split + j];
+    }
+  }
+
+#pragma omp parallel sections shared(a11, a12, a21, a22, b11, b12, b21, b22)
+  {
+#pragma omp section
+    { get_p1(a11, a22, b11, b22, slice1, size / 2); }
+#pragma omp section
+    { get_p2(a21, a22, b11, slice2, size / 2); }
+#pragma omp section
+    { get_p3(a11, b12, b22, slice3, size / 2); }
+#pragma omp section
+    { get_p4(a22, b21, b11, slice4, size / 2); }
+#pragma omp section
+    { get_p5(a11, a12, b22, slice5, size / 2); }
+#pragma omp section
+    { get_p6(a21, a11, b11, b12, slice6, size / 2); }
+#pragma omp section
+    { get_p7(a12, a22, b21, b22, slice7, size / 2); }
+  }
+  for (int i = 0; i < (size / 2) * (size / 2); i++) {
+    c11[i] = slice1[i] + slice4[i] - slice5[i] + slice7[i];
+    c12[i] = slice3[i] + slice5[i];
+    c21[i] = slice2[i] + slice4[i];
+    c22[i] = slice1[i] - slice2[i] + slice3[i] + slice6[i];
+  }
+
+  for (int i = 0; i < half_split; i++) {
+    for (int j = 0; j < half_split; j++) {
+      c[i * size + j] = c11[i * half_split + j];
+      c[i * size + half_split + j] = c12[i * half_split + j];
+      c[(half_split + i) * size + j] = c21[i * half_split + j];
+      c[(half_split + i) * size + half_split + j] = c22[i * half_split + j];
+    }
+  }
+
+  delete[] a11;
+  delete[] c11;
+}
+
+
+
+\end{lstlisting}
+main.cpp
+\begin{lstlisting}
+// Copyright 2022 Kamenev Ilya
+#include <gtest/gtest.h>
+
+#include <stdexcept>
+#include <vector>
+#include "./strassen_matrix_multiply_omp.h"
+#include <chrono>
+
+TEST(Kamenev_Strassen_Par, MatrixSize8Test) {
+  int size = 8;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_par_res(size * size);
+  std::vector<double> naive_res(size * size);
+
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  strassen_omp(a.data(), b.data(), strassen_par_res.data(), size);
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+  ASSERT_EQ(naive_res, strassen_par_res);
+}
+
+TEST(Kamenev_Strassen_Par, MatrixSize128Test) {
+  int size = 128;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_par_res(size * size);
+  std::vector<double> naive_res(size * size);
+
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  strassen_omp(a.data(), b.data(), strassen_par_res.data(), size);
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+  ASSERT_EQ(naive_res, strassen_par_res);
+}
+
+TEST(Kamenev_Strassen_Par, MatrixSize256Test) {
+  int size = 256;
+
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_par_res(size * size);
+  std::vector<double> naive_res(size * size);
+
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+
+  auto begin = std::chrono::steady_clock::now();
+  strassen_omp(a.data(), b.data(), strassen_par_res.data(), size);
+  auto end = std::chrono::steady_clock::now();
+  auto elapsed_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
+  std::cout << elapsed_ms.count() << std::endl;
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+
+  ASSERT_EQ(naive_res, strassen_par_res);
+}
+
+TEST(Kamenev_Strassen_Par, MatrixSize1024Test) {
+  int size = 1024;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_par_res(size * size);
+  std::vector<double> naive_res(size * size);
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  auto begin = std::chrono::steady_clock::now();
+  strassen_omp(a.data(), b.data(), strassen_par_res.data(), size);
+  auto end = std::chrono::steady_clock::now();
+  auto elapsed_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
+  std::cout << elapsed_ms.count() << std::endl;
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+
+  ASSERT_EQ(naive_res, strassen_par_res);
+}
+
+TEST(Kamenev_Strassen_Par, InvalidSizeTest) {
+  int size = 57;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_res(size * size);
+
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  ASSERT_THROW(strassen_omp(a.data(), b.data(), strassen_res.data(), size),
+               std::invalid_argument);
+}
+
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
+
+
+\end{lstlisting}
+
+\textbf{TBB version}
+\newline
+\newline strassen\_matrix\_multiply\_tbb.h
+\begin{lstlisting}
+// Copyright 2022 Kamenev Ilya
+#ifndef MODULES_TASK_3_KAMENEV_I_STRASSEN_MATRIX_MULTIPLY_TBB_STRASSEN_MATRIX_MULTIPLY_TBB_H_
+#define MODULES_TASK_3_KAMENEV_I_STRASSEN_MATRIX_MULTIPLY_TBB_STRASSEN_MATRIX_MULTIPLY_TBB_H_
+
+#include <tbb/tbb.h>
+#include <tbb/task_group.h>
+#include <math.h>
+#include <stdexcept>
+#include <string>
+
+void strassen_tbb(double* a, double* b, double* c, int size);
+void naive_mult(double* a, double* b, double* c, int size);
+bool is_exp_of_2(int n);
+void get_p1(double* a11, double* a22, double* b11, double* b22, double* slice,
+            int size);
+void get_p2(double* a21, double* a22, double* b11, double* slice, int size);
+void get_p3(double* a11, double* b12, double* b22, double* slice, int size);
+void get_p4(double* a22, double* b21, double* b11, double* slice, int size);
+void get_p5(double* a11, double* a12, double* b22, double* slice, int size);
+void get_p6(double* a21, double* a11, double* b11, double* b12, double* slice,
+            int size);
+void get_p7(double* a12, double* a22, double* b21, double* b22, double* slice,
+            int size);
+
+#endif  // MODULES_TASK_3_KAMENEV_I_STRASSEN_MATRIX_MULTIPLY_TBB_STRASSEN_MATRIX_MULTIPLY_TBB_H_
+
+
+
+\end{lstlisting}
+strassen\_matrix\_multiply\_tbb.cpp
+\begin{lstlisting}
+// Copyright 2022 Kamenev Ilya
+
+#include "../../modules/task_3/kamenev_i_strassen_matrix_multiply_tbb/strassen_matrix_multiply_tbb.h"
+
+void naive_mult(double* a, double* b, double* c, int size) {
+  for (int i = 0; i < size; i++) {
+    for (int j = 0; j < size; j++) {
+      c[i * size + j] = 0;
+      for (int k = 0; k < size; k++) {
+        c[i * size + j] += a[i * size + k] * b[k * size + j];
+      }
+    }
+  }
+}
+
+void get_p1(double* a11, double* a22, double* b11, double* b22, double* slice,
+        int size) {
+  double* res1 = new double[size * size * 2];
+  double* res2 = res1 + size * size;
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a11[i] + a22[i];
+    res2[i] = b11[i] + b22[i];
+  }
+  strassen_tbb(res1, res2, slice, size);
+  delete[] res1;
+}
+void get_p2(double* a21, double* a22, double* b11, double* slice, int size) {
+  double* res1 = new double[size * size];
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a21[i] + a22[i];
+  }
+  strassen_tbb(res1, b11, slice, size);
+  delete[] res1;
+}
+void get_p3(double* a11, double* b12, double* b22, double* slice, int size) {
+  double* res1 = new double[size * size];
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = b12[i] - b22[i];
+  }
+  strassen_tbb(a11, res1, slice, size);
+  delete[] res1;
+}
+void get_p4(double* a22, double* b21, double* b11, double* slice, int size) {
+  double* res1 = new double[size * size];
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = b21[i] - b11[i];
+  }
+  strassen_tbb(a22, res1, slice, size);
+  delete[] res1;
+}
+void get_p5(double* a11, double* a12, double* b22, double* slice, int size) {
+  double* res1 = new double[size * size];
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a11[i] + a12[i];
+  }
+  strassen_tbb(res1, b22, slice, size);
+  delete[] res1;
+}
+void get_p6(double* a21, double* a11, double* b11, double* b12, double* slice,
+        int size) {
+  double* res1 = new double[size * size * 2];
+  double* res2 = res1 + size * size;
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a21[i] - a11[i];
+    res2[i] = b11[i] + b12[i];
+  }
+  strassen_tbb(res1, res2, slice, size);
+  delete[] res1;
+}
+void get_p7(double* a12, double* a22, double* b21, double* b22, double* slice,
+        int size) {
+  double* res1 = new double[size * size * 2];
+  double* res2 = res1 + size * size;
+  for (int i = 0; i < size * size; i++) {
+    res1[i] = a12[i] - a22[i];
+    res2[i] = b21[i] + b22[i];
+  }
+  strassen_tbb(res1, res2, slice, size);
+  delete[] res1;
+}
+
+bool is_exp_of_2(int n) { return (n & (n - 1)) == 0; }
+
+void strassen_tbb(double* a, double* b, double* c, int size) {
+  if (!is_exp_of_2(size)) {
+    throw std::invalid_argument("no power 2");
+  }
+
+  if (size <= 64) {
+    naive_mult(a, b, c, size);
+    return;
+  }
+
+  int part_size = static_cast<int>(size * size / 4);
+
+  double* a11 = new double[size * size * 2];
+  double* a12 = a11 + part_size;
+  double* a21 = a12 + part_size;
+  double* a22 = a21 + part_size;
+
+  double* b11 = a22 + part_size;
+  double* b12 = b11 + part_size;
+  double* b21 = b12 + part_size;
+  double* b22 = b21 + part_size;
+
+  double* c11 = new double[size * size + part_size * 9];
+  double* c12 = c11 + part_size;
+  double* c21 = c12 + part_size;
+  double* c22 = c21 + part_size;
+
+  double* slice1 = c22 + part_size;
+  double* slice2 = slice1 + part_size;
+  double* slice3 = slice2 + part_size;
+  double* slice4 = slice3 + part_size;
+  double* slice5 = slice4 + part_size;
+  double* slice6 = slice5 + part_size;
+  double* slice7 = slice6 + part_size;
+
+  int half_split = static_cast<int>(size / 2);
+  for (int i = 0; i < half_split; i++) {
+    for (int j = 0; j < half_split; j++) {
+      a11[i * half_split + j] = a[i * size + j];
+      a12[i * half_split + j] = a[i * size + half_split + j];
+      a21[i * half_split + j] = a[(half_split + i) * size + j];
+      a22[i * half_split + j] = a[(half_split + i) * size + half_split + j];
+
+      b11[i * half_split + j] = b[i * size + j];
+      b12[i * half_split + j] = b[i * size + half_split + j];
+      b21[i * half_split + j] = b[(half_split + i) * size + j];
+      b22[i * half_split + j] = b[(half_split + i) * size + half_split + j];
+    }
+  }
+
+  tbb::task_group tasks;
+  tasks.run([=] { get_p1(a11, a22, b11, b22, slice1, size / 2); });
+  tasks.run([=] { get_p2(a21, a22, b11, slice2, size / 2); });
+  tasks.run([=] { get_p3(a11, b12, b22, slice3, size / 2); });
+  tasks.run([=] { get_p4(a22, b21, b11, slice4, size / 2); });
+  tasks.run([=] { get_p5(a11, a12, b22, slice5, size / 2); });
+  tasks.run([=] { get_p6(a21, a11, b11, b12, slice6, size / 2); });
+  tasks.run([=] { get_p7(a12, a22, b21, b22, slice7, size / 2); });
+  tasks.wait();
+
+  for (int i = 0; i < (size / 2) * (size / 2); i++) {
+    c11[i] = slice1[i] + slice4[i] - slice5[i] + slice7[i];
+    c12[i] = slice3[i] + slice5[i];
+    c21[i] = slice2[i] + slice4[i];
+    c22[i] = slice1[i] - slice2[i] + slice3[i] + slice6[i];
+  }
+
+  for (int i = 0; i < half_split; i++) {
+    for (int j = 0; j < half_split; j++) {
+      c[i * size + j] = c11[i * half_split + j];
+      c[i * size + half_split + j] = c12[i * half_split + j];
+      c[(half_split + i) * size + j] = c21[i * half_split + j];
+      c[(half_split + i) * size + half_split + j] = c22[i * half_split + j];
+    }
+  }
+
+  delete[] a11;
+  delete[] c11;
+}
+
+
+
+\end{lstlisting}
+main.cpp
+\begin{lstlisting}
+// Copyright 2022 Kamenev Ilya
+#include <gtest/gtest.h>
+#include "./strassen_matrix_multiply_tbb.h"
+#include <chrono>
+
+TEST(Kamenev_Strassen_Par, MatrixSize8Test) {
+  int size = 8;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_par_res(size * size);
+  std::vector<double> naive_res(size * size);
+
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  strassen_tbb(a.data(), b.data(), strassen_par_res.data(), size);
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+  ASSERT_EQ(naive_res, strassen_par_res);
+}
+
+TEST(Kamenev_Strassen_Par, MatrixSize128Test) {
+  int size = 128;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_par_res(size * size);
+  std::vector<double> naive_res(size * size);
+
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  strassen_tbb(a.data(), b.data(), strassen_par_res.data(), size);
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+  ASSERT_EQ(naive_res, strassen_par_res);
+}
+
+TEST(Kamenev_Strassen_Par, MatrixSize256Test) {
+  int size = 256;
+
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_par_res(size * size);
+  std::vector<double> naive_res(size * size);
+
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  auto begin = std::chrono::steady_clock::now();
+  strassen_tbb(a.data(), b.data(), strassen_par_res.data(), size);
+  auto end = std::chrono::steady_clock::now();
+  auto elapsed_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
+  std::cout << elapsed_ms.count() << std::endl;
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+
+  ASSERT_EQ(naive_res, strassen_par_res);
+}
+
+TEST(Kamenev_Strassen_Par, MatrixSize1024Test) {
+  int size = 1024;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_par_res(size * size);
+  std::vector<double> naive_res(size * size);
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  auto begin = std::chrono::steady_clock::now();
+  strassen_tbb(a.data(), b.data(), strassen_par_res.data(), size);
+  auto end = std::chrono::steady_clock::now();
+  auto elapsed_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - begin);
+  std::cout << elapsed_ms.count() << std::endl;
+  naive_mult(a.data(), b.data(), naive_res.data(), size);
+
+  ASSERT_EQ(naive_res, strassen_par_res);
+}
+
+TEST(Kamenev_Strassen_Par, InvalidSizeTest) {
+  int size = 57;
+  std::vector<double> a(size * size);
+  std::vector<double> b(size * size);
+  std::vector<double> strassen_res(size * size);
+
+  for (size_t i = 0; i < size * size; i++) {
+    a[i] = i + 1;
+    b[i] = size * size - i;
+  }
+  ASSERT_THROW(strassen_tbb(a.data(), b.data(), strassen_res.data(), size),
+               std::invalid_argument);
+}
+
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
+
+
+\end{lstlisting}
+
+\end{document}
